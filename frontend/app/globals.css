@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  min-height: 100vh;
+  background: #f0f2f5;
+  color: #1a1f2e;
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid #1d6fdb;
+  outline-offset: 2px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #dce1ea;
+  border-top-color: #1d6fdb;
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-up {
+  animation: fadeUp 0.35s ease both;
+}
+
+@keyframes grow {
+  from { width: 0%; }
+}
+.score-fill {
+  animation: grow 0.8s ease both;
+}

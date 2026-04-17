@@ -1,0 +1,25 @@
+# Environment variables — never commit real keys
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+.venv/
+
+# Pytest
+.pytest_cache/
+.coverage
+
+# IDEs
+.vscode/
+.idea/
+
+# Claude
+.claude/
+node_modules/
+.next/

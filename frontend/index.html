@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Orchid Consulting Property Investment Analysis</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d1117;
+      --surface:   #161b22;
+      --surface2:  #1c2230;
+      --border:    #30363d;
+      --accent:    #2f81f7;
+      --accent2:   #1a5eb8;
+      --green:     #3fb950;
+      --yellow:    #d29922;
+      --red:       #f85149;
+      --text:      #e6edf3;
+      --muted:     #8b949e;
+      --card-r:    12px;
+    }
+
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; }
+
+    /* ── HEADER ── */
+    header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 40px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 100;
+    }
+    .logo { display: flex; align-items: center; gap: 10px; font-size: 1.3rem; font-weight: 700; letter-spacing: -.3px; }
+    .logo-icon { width: 32px; height: 32px; background: var(--accent); border-radius: 8px;
+      display: flex; align-items: center; justify-content: center; font-size: 1rem; }
+    .logo span { color: var(--accent); }
+    .tagline { font-size: .8rem; color: var(--muted); }
+
+    /* ── HERO / SEARCH ── */
+    .hero {
+      text-align: center; padding: 72px 24px 56px;
+      background: linear-gradient(180deg, #0d1117 0%, #0d1723 100%);
+    }
+    .hero h1 { font-size: 2.4rem; font-weight: 800; letter-spacing: -.5px; margin-bottom: 12px; }
+    .hero h1 em { font-style: normal; color: var(--accent); }
+    .hero p { color: var(--muted); font-size: 1.05rem; margin-bottom: 36px; }
+
+    .search-box {
+      display: flex; max-width: 640px; margin: 0 auto;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 50px; overflow: hidden;
+      box-shadow: 0 0 0 0 var(--accent);
+      transition: box-shadow .2s;
+    }
+    .search-box:focus-within { box-shadow: 0 0 0 3px rgba(47,129,247,.35); border-color: var(--accent); }
+    .search-box input {
+      flex: 1; padding: 16px 24px; background: transparent; border: none; outline: none;
+      color: var(--text); font-size: 1rem;
+    }
+    .search-box input::placeholder { color: var(--muted); }
+    .search-box button {
+      margin: 6px; padding: 0 28px; background: var(--accent); color: #fff;
+      border: none; border-radius: 44px; font-size: .95rem; font-weight: 600;
+      cursor: pointer; transition: background .15s; white-space: nowrap;
+    }
+    .search-box button:hover { background: var(--accent2); }
+    .search-box button:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* ── LOADING ── */
+    #loading { display: none; text-align: center; padding: 60px 24px; }
+    .spinner {
+      width: 48px; height: 48px; border: 4px solid var(--border);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin .8s linear infinite; margin: 0 auto 20px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-steps { display: flex; flex-direction: column; gap: 10px; align-items: center; margin-top: 24px; }
+    .step { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: .9rem; }
+    .step.done { color: var(--green); }
+    .step.active { color: var(--text); }
+    .step-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+
+    /* ── ERROR ── */
+    #error-box {
+      display: none; max-width: 640px; margin: 32px auto;
+      background: rgba(248,81,73,.1); border: 1px solid rgba(248,81,73,.4);
+      border-radius: var(--card-r); padding: 20px 24px;
+      color: var(--red); font-size: .95rem; text-align: center;
+    }
+
+    /* ── RESULTS ── */
+    #results { display: none; max-width: 1100px; margin: 0 auto; padding: 40px 24px 80px; }
+
+    .property-banner {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--card-r); padding: 28px 32px; margin-bottom: 28px;
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;
+    }
+    .property-banner .address-label { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+    .property-banner .address-text { font-size: 1.4rem; font-weight: 700; }
+    .risk-badge {
+      padding: 6px 16px; border-radius: 20px; font-size: .85rem; font-weight: 600;
+    }
+    .risk-very-high   { background: rgba(248,81,73,.15);  color: var(--red);    border: 1px solid rgba(248,81,73,.3); }
+    .risk-high        { background: rgba(248,81,73,.1);   color: #f0846e;       border: 1px solid rgba(248,81,73,.2); }
+    .risk-moderate    { background: rgba(210,153,34,.15); color: var(--yellow); border: 1px solid rgba(210,153,34,.3); }
+    .risk-low         { background: rgba(63,185,80,.1);   color: var(--green);  border: 1px solid rgba(63,185,80,.2); }
+    .risk-unknown     { background: rgba(139,148,158,.1); color: var(--muted);  border: 1px solid var(--border); }
+
+    .section-title {
+      font-size: .7rem; text-transform: uppercase; letter-spacing: 1.5px;
+      color: var(--muted); margin-bottom: 14px; font-weight: 600;
+    }
+
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 28px; }
+    @media (max-width: 800px) { .grid-3 { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 560px) { .grid-3, .grid-2 { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--card-r); padding: 22px 24px;
+    }
+    .card-label { font-size: .75rem; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .8px; }
+    .card-value { font-size: 1.6rem; font-weight: 700; line-height: 1.1; }
+    .card-value.small { font-size: 1.1rem; font-weight: 600; }
+    .card-sub { font-size: .78rem; color: var(--muted); margin-top: 4px; }
+    .card-icon { font-size: 1.4rem; margin-bottom: 10px; }
+
+    .detail-grid {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--card-r); overflow: hidden; margin-bottom: 28px;
+    }
+    .detail-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 14px 24px; border-bottom: 1px solid var(--border);
+    }
+    .detail-row:last-child { border-bottom: none; }
+    .detail-row:nth-child(even) { background: rgba(255,255,255,.02); }
+    .detail-key { color: var(--muted); font-size: .88rem; }
+    .detail-val { font-size: .93rem; font-weight: 600; text-align: right; max-width: 60%; }
+
+    .null-val { color: var(--muted); font-style: italic; font-weight: 400; font-size: .85rem; }
+
+    .flood-chip {
+      display: inline-block; padding: 3px 10px; border-radius: 12px;
+      font-size: .8rem; font-weight: 600;
+    }
+    .flood-x   { background: rgba(63,185,80,.15);  color: var(--green); }
+    .flood-ae  { background: rgba(248,81,73,.15);  color: var(--red); }
+    .flood-a   { background: rgba(210,153,34,.15); color: var(--yellow); }
+    .flood-def { background: rgba(139,148,158,.1); color: var(--muted); }
+
+    .score-bar { height: 6px; border-radius: 3px; background: var(--border); margin-top: 8px; overflow: hidden; }
+    .score-fill { height: 100%; border-radius: 3px; background: var(--accent); transition: width .8s ease; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">⬡</div>
+    Prop<span>IQ</span>
+  </div>
+  <div class="tagline">Property Investment Intelligence</div>
+</header>
+
+<section class="hero">
+  <h1>Analyze any property<br><em>in seconds</em></h1>
+  <p>Enter a U.S. address to get property details, neighborhood insights, and market intelligence.</p>
+  <div class="search-box">
+    <input id="address-input" type="text" placeholder="e.g. 1234 Elm St, Dallas, TX 75218"
+      onkeydown="if(event.key==='Enter') search()" />
+    <button id="search-btn" onclick="search()">Analyze Property</button>
+  </div>
+</section>
+
+<div id="error-box"></div>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <p style="color:var(--muted);font-size:.95rem;">Gathering data from multiple sources…</p>
+  <div class="loading-steps">
+    <div class="step" id="step-attom"><span class="step-dot"></span>ATTOM — Property records</div>
+    <div class="step" id="step-fema"><span class="step-dot"></span>FEMA — Flood &amp; hazard risk</div>
+    <div class="step" id="step-census"><span class="step-dot"></span>U.S. Census — Demographics</div>
+    <div class="step" id="step-rentcast"><span class="step-dot"></span>RentCast — Market data</div>
+    <div class="step" id="step-zoning"><span class="step-dot"></span>ArcGIS — Zoning information</div>
+  </div>
+</div>
+
+<div id="results"></div>
+
+<script>
+  const API = '/v1/property/enrich';
+
+  function fmt(val, prefix='', suffix='', decimals=0) {
+    if (val == null) return '<span class="null-val">Not available</span>';
+    const n = typeof val === 'number' ? val.toLocaleString('en-US', { maximumFractionDigits: decimals }) : val;
+    return `${prefix}${n}${suffix}`;
+  }
+
+  function fmtMoney(val) {
+    if (val == null) return '<span class="null-val">Not available</span>';
+    if (val >= 1_000_000) return '$' + (val / 1_000_000).toFixed(2) + 'M';
+    if (val >= 1_000)     return '$' + Math.round(val).toLocaleString('en-US');
+    return '$' + val;
+  }
+
+  function floodChip(zone) {
+    if (!zone) return '<span class="null-val">Not available</span>';
+    const cls = zone === 'X' ? 'flood-x' : zone.startsWith('AE') ? 'flood-ae' : zone.startsWith('A') ? 'flood-a' : 'flood-def';
+    const label = zone === 'X' ? `Zone X — Minimal Risk` : zone.startsWith('A') ? `Zone ${zone} — High Risk` : `Zone ${zone}`;
+    return `<span class="flood-chip ${cls}">${label}</span>`;
+  }
+
+  function riskBadge(rating) {
+    if (!rating) return '';
+    const lower = rating.toLowerCase();
+    let cls = 'risk-unknown';
+    if (lower.includes('very high'))   cls = 'risk-very-high';
+    else if (lower.includes('high'))   cls = 'risk-high';
+    else if (lower.includes('moderate')) cls = 'risk-moderate';
+    else if (lower.includes('low'))    cls = 'risk-low';
+    return `<span class="risk-badge ${cls}">${rating} Risk</span>`;
+  }
+
+  function scoreBar(val, max) {
+    if (val == null) return '';
+    const pct = Math.min(100, (val / max) * 100);
+    return `<div class="score-bar"><div class="score-fill" style="width:${pct}%"></div></div>`;
+  }
+
+  function detailRow(key, val) {
+    return `<div class="detail-row"><span class="detail-key">${key}</span><span class="detail-val">${val}</span></div>`;
+  }
+
+  async function animateSteps() {
+    const steps = ['step-attom','step-fema','step-census','step-rentcast','step-zoning'];
+    const delays = [0, 600, 1000, 1400, 1800];
+    steps.forEach((id, i) => {
+      setTimeout(() => {
+        steps.forEach(s => document.getElementById(s).classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        if (i > 0) document.getElementById(steps[i-1]).classList.add('done');
+      }, delays[i]);
+    });
+  }
+
+  async function search() {
+    const address = document.getElementById('address-input').value.trim();
+    if (!address) return;
+
+    document.getElementById('error-box').style.display = 'none';
+    document.getElementById('results').style.display = 'none';
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('search-btn').disabled = true;
+
+    // Reset steps
+    ['step-attom','step-fema','step-census','step-rentcast','step-zoning'].forEach(id => {
+      const el = document.getElementById(id);
+      el.classList.remove('active','done');
+    });
+    animateSteps();
+
+    try {
+      const res = await fetch(API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address })
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Unknown error from server');
+      }
+
+      document.getElementById('loading').style.display = 'none';
+      renderResults(address, data);
+    } catch (err) {
+      document.getElementById('loading').style.display = 'none';
+      const box = document.getElementById('error-box');
+      box.textContent = '⚠ ' + (err.message || 'Could not connect to the API. Make sure the server is running.');
+      box.style.display = 'block';
+    } finally {
+      document.getElementById('search-btn').disabled = false;
+    }
+  }
+
+  function renderResults(address, data) {
+    const p = data.property    || {};
+    const n = data.neighborhood || {};
+    const m = data.market      || {};
+
+    const schoolPct = n.schoolRatings != null ? ((n.schoolRatings / 4.3) * 100).toFixed(0) : null;
+
+    const html = `
+      <!-- Banner -->
+      <div class="property-banner">
+        <div>
+          <div class="address-label">Analyzed Property</div>
+          <div class="address-text">📍 ${address}</div>
+          <div style="margin-top:8px;font-size:.85rem;color:var(--muted)">
+            ${p.constructionType || ''} &nbsp;·&nbsp; Built ${p.yearBuilt || 'N/A'} &nbsp;·&nbsp; ${p.squareFootage ? Math.round(p.squareFootage).toLocaleString() + ' sq ft' : 'N/A'}
+          </div>
+        </div>
+        ${riskBadge(p.hazardRiskZone)}
+      </div>
+
+      <!-- Key metrics -->
+      <div class="section-title">Market Snapshot</div>
+      <div class="grid-3" style="margin-bottom:28px">
+        <div class="card">
+          <div class="card-icon">🏡</div>
+          <div class="card-label">Median Home Value</div>
+          <div class="card-value">${fmtMoney(m.medianHomeValue)}</div>
+        </div>
+        <div class="card">
+          <div class="card-icon">📈</div>
+          <div class="card-label">Avg Days on Market</div>
+          <div class="card-value">${m.daysOnMarket != null ? m.daysOnMarket + '<span style="font-size:1rem;font-weight:400"> days</span>' : '<span class="null-val">N/A</span>'}</div>
+        </div>
+        <div class="card">
+          <div class="card-icon">📊</div>
+          <div class="card-label">Population Growth</div>
+          <div class="card-value">${m.populationGrowth != null ? (m.populationGrowth > 0 ? '+' : '') + m.populationGrowth.toFixed(1) + '%' : '<span class="null-val">N/A</span>'}</div>
+          <div class="card-sub">4-year estimate (Census)</div>
+        </div>
+      </div>
+
+      <!-- Neighborhood -->
+      <div class="section-title">Neighborhood</div>
+      <div class="grid-3" style="margin-bottom:28px">
+        <div class="card">
+          <div class="card-icon">💰</div>
+          <div class="card-label">Median Household Income</div>
+          <div class="card-value">${fmtMoney(n.medianHouseholdIncome)}</div>
+          <div class="card-sub">ACS 5-Year Estimate</div>
+        </div>
+        <div class="card">
+          <div class="card-icon">🏘</div>
+          <div class="card-label">Homeownership Rate</div>
+          <div class="card-value">${n.homeownershipRate != null ? n.homeownershipRate.toFixed(1) + '%' : '<span class="null-val">N/A</span>'}</div>
+          ${n.homeownershipRate != null ? scoreBar(n.homeownershipRate, 100) : ''}
+        </div>
+        <div class="card">
+          <div class="card-icon">💼</div>
+          <div class="card-label">Unemployment Rate</div>
+          <div class="card-value">${n.unemploymentRate != null ? n.unemploymentRate.toFixed(1) + '%' : '<span class="null-val">N/A</span>'}</div>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-bottom:28px">
+        <div class="card">
+          <div class="card-icon">🎓</div>
+          <div class="card-label">School Ratings</div>
+          <div class="card-value">${n.schoolRatings != null ? n.schoolRatings.toFixed(2) + ' <span style="font-size:1rem;font-weight:400">/ 4.3 GPA</span>' : '<span class="null-val">N/A</span>'}</div>
+          ${schoolPct ? scoreBar(n.schoolRatings, 4.3) : ''}
+          <div class="card-sub">Average of nearby schools</div>
+        </div>
+        <div class="card">
+          <div class="card-icon">🔒</div>
+          <div class="card-label">Crime Statistics</div>
+          <div class="card-value small">${n.crimeStatistics != null ? n.crimeStatistics : '<span class="null-val">Not available</span>'}</div>
+        </div>
+      </div>
+
+      <!-- Property Details -->
+      <div class="section-title">Property Details</div>
+      <div class="detail-grid" style="margin-bottom:28px">
+        ${detailRow('Year Built',          p.yearBuilt        || '<span class="null-val">N/A</span>')}
+        ${detailRow('Square Footage',      p.squareFootage    ? Math.round(p.squareFootage).toLocaleString() + ' sq ft' : '<span class="null-val">N/A</span>')}
+        ${detailRow('Bedrooms',            p.numBedrooms      != null ? p.numBedrooms : '<span class="null-val">N/A</span>')}
+        ${detailRow('Bathrooms',           p.numBathrooms     != null ? p.numBathrooms : '<span class="null-val">N/A</span>')}
+        ${detailRow('Floors',              p.numFloors        != null ? p.numFloors : '<span class="null-val">N/A</span>')}
+        ${detailRow('Construction Type',   p.constructionType || '<span class="null-val">N/A</span>')}
+        ${detailRow('Roof Type',           p.roofType         ? p.roofType.trim() : '<span class="null-val">N/A</span>')}
+        ${detailRow('Foundation',          p.foundationType   || '<span class="null-val">N/A</span>')}
+        ${detailRow('Flood Zone',          floodChip(p.floodZone))}
+        ${detailRow('Hazard Risk Zone',    p.hazardRiskZone   || '<span class="null-val">N/A</span>')}
+      </div>
+
+      <!-- Market Details -->
+      <div class="section-title">Market Details</div>
+      <div class="detail-grid">
+        ${detailRow('Rent Prices (AVM)',        fmtMoney(m.rentPrices))}
+        ${detailRow('Price Appreciation',       m.homePriceAppreciationRate != null ? '$' + m.homePriceAppreciationRate.toFixed(2) + ' / sq ft' : '<span class="null-val">N/A</span>')}
+        ${detailRow('Zoning',                   m.zoningInformation || '<span class="null-val">N/A</span>')}
+      </div>
+    `;
+
+    const el = document.getElementById('results');
+    el.innerHTML = html;
+    el.style.display = 'block';
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+</script>
+
+</body>
+</html>
