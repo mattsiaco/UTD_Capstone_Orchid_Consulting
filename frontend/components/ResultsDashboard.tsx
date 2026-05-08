@@ -1,6 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import { EnrichResponse } from './types';
+import InvestorSimulator, { defaultRatings } from './InvestorSimulator';
+import InsightsTab, { ScoreResult } from './InsightsTab';
 
 // ── Formatters ───────────────────────────────────────────────────────────────
 
@@ -76,10 +79,10 @@ interface StatCardProps {
   source?:   string;
   bar?:      number;
   positive?: boolean;
-  accent?:   string; // left border color class
+  accent?:   string;
 }
 
-function StatCard({ label, value, source, bar, positive, accent }: StatCardProps) {
+function StatCard({ label, value, source, bar, accent }: StatCardProps) {
   return (
     <div className={`bg-white border border-border rounded-lg p-5 ${accent ? `border-l-4 ${accent}` : ''}`}>
       <div className="text-xs text-ink-light font-medium mb-2 uppercase tracking-wide">{label}</div>
@@ -109,6 +112,45 @@ function DataTable({ rows }: { rows: { label: string; value: React.ReactNode }[]
   );
 }
 
+// ── Tab bar ───────────────────────────────────────────────────────────────────
+
+type Tab = 'report' | 'simulator' | 'insights';
+
+const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
+  {
+    id: 'report',
+    label: 'Property Report',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+        <polyline points="9 22 9 12 15 12 15 22"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'simulator',
+    label: 'Investor Simulator',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
+        <line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/>
+        <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>
+        <line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/>
+        <line x1="17" y1="16" x2="23" y2="16"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'insights',
+    label: 'Insights',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+    ),
+  },
+];
+
 // ── Dashboard ────────────────────────────────────────────────────────────────
 
 interface Props { address: string; data: EnrichResponse; }
@@ -117,6 +159,37 @@ export default function ResultsDashboard({ address, data }: Props) {
   const p = data.property;
   const n = data.neighborhood;
   const m = data.market;
+
+  const [activeTab,    setActiveTab]    = useState<Tab>('report');
+  const [ratings,      setRatings]      = useState<Record<string, number>>(defaultRatings);
+  const [scoreResult,  setScoreResult]  = useState<ScoreResult | null>(null);
+  const [scoreLoading, setScoreLoading] = useState(false);
+  const [scoreError,   setScoreError]   = useState<string | null>(null);
+
+  function handleRatingChange(key: string, val: number) {
+    setRatings(prev => ({ ...prev, [key]: val }));
+  }
+
+  async function handleRun() {
+    setScoreLoading(true);
+    setScoreError(null);
+
+    try {
+      const res = await fetch('/api/score', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ enrichedData: data, userRanks: ratings }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? 'Scoring failed');
+      setScoreResult(json as ScoreResult);
+      setActiveTab('insights');
+    } catch (err) {
+      setScoreError(err instanceof Error ? err.message : 'Could not compute score');
+    } finally {
+      setScoreLoading(false);
+    }
+  }
 
   const popDelta  = m.populationGrowth != null
     ? `${m.populationGrowth > 0 ? '+' : ''}${m.populationGrowth.toFixed(1)}% (4-yr)`
@@ -128,12 +201,12 @@ export default function ResultsDashboard({ address, data }: Props) {
     <div className="max-w-5xl mx-auto px-6 pb-24 pt-8 fade-up">
 
       {/* Property header */}
-      <div className="rounded-xl px-7 py-6 mb-7 text-white"
+      <div className="rounded-xl px-7 py-6 mb-0 text-white"
         style={{ background: 'linear-gradient(135deg, #0f2342 0%, #1a3a6b 100%)' }}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="text-xs text-blue-200 uppercase tracking-widest font-semibold mb-2">
-              Property Report
+              Property Analysis
             </div>
             <div className="text-xl font-bold text-white mb-2">{address}</div>
             <div className="flex flex-wrap gap-3 mt-1">
@@ -171,105 +244,171 @@ export default function ResultsDashboard({ address, data }: Props) {
         </div>
       </div>
 
-      {/* Market */}
-      <Section title="Market Overview" accent="bg-accent">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <StatCard
-            label="Median Home Value"
-            value={m.medianHomeValue != null ? fmtMoney(m.medianHomeValue) : <NA />}
-            source="Census ACS 5-yr"
-            accent="border-l-accent"
-          />
-          <StatCard
-            label="Avg Days on Market"
-            value={m.daysOnMarket != null ? `${m.daysOnMarket} days` : <NA />}
-            source="RentCast"
-            accent="border-l-accent"
-          />
-          <StatCard
-            label="Population Growth"
-            value={m.populationGrowth != null
-              ? <span className={m.populationGrowth > 0 ? 'text-positive' : 'text-danger'}>
-                  {m.populationGrowth > 0 ? '+' : ''}{m.populationGrowth.toFixed(1)}%
-                </span>
-              : <NA />}
-            source="Census 2018 → 2022"
-            accent="border-l-accent"
-          />
-          <StatCard
-            label="Price / Sq Ft"
-            value={m.homePriceAppreciationRate != null ? `$${m.homePriceAppreciationRate.toFixed(0)}` : <NA />}
-            source="ATTOM sales"
-            accent="border-l-accent"
-          />
-        </div>
-      </Section>
-
-      {/* Neighborhood */}
-      <Section title="Neighborhood" accent="bg-[#7c3aed]">
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-          <StatCard
-            label="Median Household Income"
-            value={n.medianHouseholdIncome != null ? fmtMoney(n.medianHouseholdIncome) : <NA />}
-            source="ACS 5-yr estimate"
-            accent="border-l-[#7c3aed]"
-          />
-          <StatCard
-            label="Homeownership Rate"
-            value={n.homeownershipRate != null ? fmtPct(n.homeownershipRate) : <NA />}
-            bar={ownerBar}
-            accent="border-l-[#7c3aed]"
-          />
-          <StatCard
-            label="Unemployment Rate"
-            value={n.unemploymentRate != null ? fmtPct(n.unemploymentRate) : <NA />}
-            source="Civilian labor force"
-            accent="border-l-[#7c3aed]"
-          />
-          <StatCard
-            label="School Rating"
-            value={n.schoolRatings != null ? `${n.schoolRatings.toFixed(2)} / 4.3` : <NA />}
-            bar={schoolBar}
-            source="Nearby schools avg"
-            accent="border-l-[#7c3aed]"
-          />
-          <StatCard
-            label="Crime Index"
-            value={n.crimeStatistics != null ? String(n.crimeStatistics) : <NA />}
-            accent="border-l-[#7c3aed]"
-          />
-        </div>
-      </Section>
-
-      {/* Property + Market side by side */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-        <Section title="Property Details" accent="bg-positive">
-          <DataTable rows={[
-            { label: 'Year Built',     value: p.yearBuilt ?? <NA /> },
-            { label: 'Square Footage', value: p.squareFootage != null ? `${Math.round(p.squareFootage).toLocaleString()} sq ft` : <NA /> },
-            { label: 'Bedrooms',       value: p.numBedrooms ?? <NA /> },
-            { label: 'Bathrooms',      value: p.numBathrooms ?? <NA /> },
-            { label: 'Floors',         value: p.numFloors ?? <NA /> },
-            { label: 'Construction',   value: p.constructionType ?? <NA /> },
-            { label: 'Roof',           value: p.roofType ? p.roofType.trim() : <NA /> },
-            { label: 'Foundation',     value: p.foundationType ?? <NA /> },
-            { label: 'Flood Zone',     value: <FloodTag zone={p.floodZone} /> },
-            { label: 'Hazard Risk',    value: <RiskTag rating={p.hazardRiskZone} /> },
-          ]} />
-        </Section>
-
-        <Section title="Market Details" accent="bg-warning">
-          <DataTable rows={[
-            { label: 'Rent (AVM Est.)',    value: m.rentPrices != null ? fmtMoney(m.rentPrices) : <NA /> },
-            { label: 'Zoning',             value: m.zoningInformation ?? <NA /> },
-            { label: 'Days on Market',     value: m.daysOnMarket != null ? `${m.daysOnMarket} days` : <NA /> },
-            { label: 'Price / Sq Ft',      value: m.homePriceAppreciationRate != null ? `$${m.homePriceAppreciationRate.toFixed(2)}` : <NA /> },
-            { label: 'Population Growth',  value: popDelta ?? <NA /> },
-            { label: 'Median Home Value',  value: m.medianHomeValue != null ? fmtMoney(m.medianHomeValue) : <NA /> },
-          ]} />
-        </Section>
+      {/* Tab bar */}
+      <div className="flex border-b border-border bg-white rounded-b-none sticky top-[57px] z-40 shadow-sm">
+        {TABS.map(tab => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-5 py-3.5 text-sm font-medium transition-colors relative focus:outline-none ${
+                isActive
+                  ? 'text-accent'
+                  : 'text-ink-mid hover:text-ink hover:bg-slate/50'
+              }`}
+            >
+              {tab.icon}
+              {tab.label}
+              {/* Active underline */}
+              {isActive && (
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent rounded-t-full" />
+              )}
+              {/* Insights badge when simulation has been run */}
+              {tab.id === 'insights' && scoreResult && (
+                <span className="ml-1 w-1.5 h-1.5 rounded-full bg-positive inline-block" />
+              )}
+            </button>
+          );
+        })}
       </div>
 
+      {/* Tab content */}
+      <div className="mt-7">
+
+        {/* ── Property Report ── */}
+        {activeTab === 'report' && (
+          <div className="fade-up">
+
+            {/* Market */}
+            <Section title="Market Overview" accent="bg-accent">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <StatCard
+                  label="Median Home Value"
+                  value={m.medianHomeValue != null ? fmtMoney(m.medianHomeValue) : <NA />}
+                  source="Census ACS 5-yr"
+                  accent="border-l-accent"
+                />
+                <StatCard
+                  label="Avg Days on Market"
+                  value={m.daysOnMarket != null ? `${m.daysOnMarket} days` : <NA />}
+                  source="RentCast"
+                  accent="border-l-accent"
+                />
+                <StatCard
+                  label="Population Growth"
+                  value={m.populationGrowth != null
+                    ? <span className={m.populationGrowth > 0 ? 'text-positive' : 'text-danger'}>
+                        {m.populationGrowth > 0 ? '+' : ''}{m.populationGrowth.toFixed(1)}%
+                      </span>
+                    : <NA />}
+                  source="Census 2018 → 2022"
+                  accent="border-l-accent"
+                />
+                <StatCard
+                  label="Price / Sq Ft"
+                  value={m.homePriceAppreciationRate != null ? `$${m.homePriceAppreciationRate.toFixed(0)}` : <NA />}
+                  source="ATTOM sales"
+                  accent="border-l-accent"
+                />
+              </div>
+            </Section>
+
+            {/* Neighborhood */}
+            <Section title="Neighborhood" accent="bg-[#7c3aed]">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                <StatCard
+                  label="Median Household Income"
+                  value={n.medianHouseholdIncome != null ? fmtMoney(n.medianHouseholdIncome) : <NA />}
+                  source="ACS 5-yr estimate"
+                  accent="border-l-[#7c3aed]"
+                />
+                <StatCard
+                  label="Homeownership Rate"
+                  value={n.homeownershipRate != null ? fmtPct(n.homeownershipRate) : <NA />}
+                  bar={ownerBar}
+                  accent="border-l-[#7c3aed]"
+                />
+                <StatCard
+                  label="Unemployment Rate"
+                  value={n.unemploymentRate != null ? fmtPct(n.unemploymentRate) : <NA />}
+                  source="Civilian labor force"
+                  accent="border-l-[#7c3aed]"
+                />
+                <StatCard
+                  label="School Rating"
+                  value={n.schoolRatings != null ? `${n.schoolRatings.toFixed(2)} / 4.3` : <NA />}
+                  bar={schoolBar}
+                  source="Nearby schools avg"
+                  accent="border-l-[#7c3aed]"
+                />
+                <StatCard
+                  label="Crime Index"
+                  value={n.crimeStatistics != null ? String(n.crimeStatistics) : <NA />}
+                  accent="border-l-[#7c3aed]"
+                />
+              </div>
+            </Section>
+
+            {/* Property + Market side by side */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <Section title="Property Details" accent="bg-positive">
+                <DataTable rows={[
+                  { label: 'Year Built',     value: p.yearBuilt ?? <NA /> },
+                  { label: 'Square Footage', value: p.squareFootage != null ? `${Math.round(p.squareFootage).toLocaleString()} sq ft` : <NA /> },
+                  { label: 'Bedrooms',       value: p.numBedrooms ?? <NA /> },
+                  { label: 'Bathrooms',      value: p.numBathrooms ?? <NA /> },
+                  { label: 'Floors',         value: p.numFloors ?? <NA /> },
+                  { label: 'Construction',   value: p.constructionType ?? <NA /> },
+                  { label: 'Roof',           value: p.roofType ? p.roofType.trim() : <NA /> },
+                  { label: 'Foundation',     value: p.foundationType ?? <NA /> },
+                  { label: 'Flood Zone',     value: <FloodTag zone={p.floodZone} /> },
+                  { label: 'Hazard Risk',    value: <RiskTag rating={p.hazardRiskZone} /> },
+                ]} />
+              </Section>
+
+              <Section title="Market Details" accent="bg-warning">
+                <DataTable rows={[
+                  { label: 'Rent (AVM Est.)',    value: m.rentPrices != null ? fmtMoney(m.rentPrices) : <NA /> },
+                  { label: 'Zoning',             value: m.zoningInformation ?? <NA /> },
+                  { label: 'Days on Market',     value: m.daysOnMarket != null ? `${m.daysOnMarket} days` : <NA /> },
+                  { label: 'Price / Sq Ft',      value: m.homePriceAppreciationRate != null ? `$${m.homePriceAppreciationRate.toFixed(2)}` : <NA /> },
+                  { label: 'Population Growth',  value: popDelta ?? <NA /> },
+                  { label: 'Median Home Value',  value: m.medianHomeValue != null ? fmtMoney(m.medianHomeValue) : <NA /> },
+                ]} />
+              </Section>
+            </div>
+
+          </div>
+        )}
+
+        {/* ── Investor Simulator ── */}
+        {activeTab === 'simulator' && (
+          <>
+            {scoreError && (
+              <div className="mb-4 bg-danger-bg border border-danger/20 text-danger text-sm px-5 py-3.5 rounded-lg">
+                {scoreError}
+              </div>
+            )}
+            <InvestorSimulator
+              ratings={ratings}
+              onRatingChange={handleRatingChange}
+              onRun={handleRun}
+              loading={scoreLoading}
+            />
+          </>
+        )}
+
+        {/* ── Insights ── */}
+        {activeTab === 'insights' && (
+          <InsightsTab
+            data={data}
+            scoreResult={scoreResult}
+            onGoSimulate={() => setActiveTab('simulator')}
+          />
+        )}
+
+      </div>
     </div>
   );
 }
